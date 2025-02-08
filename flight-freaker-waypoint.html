@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base href=".">
+    <title>ADS-B Aircraft Simulator</title>
+    <!-- Mapbox GL JS CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        .control-panel {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .display-panel {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .data-display {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .data-item {
+            background-color: #333;
+            padding: 10px; 
+            border-radius: 5px;
+            word-wrap: break-word;
+        }
+        .data-item label {
+            display: block;
+            font-size: 0.8em;
+            color: #aaa;
+        }
+        .data-item span {
+            font-size: 1.1em;
+            font-weight: bold;
+            font-family: monospace;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+        input, button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #333;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #flightPath {
+            width: 100%;
+            height: 400px;
+            background-color: #333;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .waypoint-list {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .waypoint-item {
+            background-color: #333;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        #adsbMessage {
+            font-family: monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+            white-space: pre-wrap;
+            color: #fff;
+        }
+        #decodedAdsb {
+            font-family: monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel">
+            <h2>Flight Controls</h2>
+            <div>
+                <h3>Start Point</h3>
+                <input type="number" id="startLat" placeholder="Start Latitude" step="0.000001" required>
+                <input type="number" id="startLon" placeholder="Start Longitude" step="0.000001" required>
+            </div>
+            <div>
+                <h3>End Point</h3>
+                <input type="number" id="endLat" placeholder="End Latitude" step="0.000001" required>
+                <input type="number" id="endLon" placeholder="End Longitude" step="0.000001" required>
+            </div>
+            <div>
+                <h3>Add Waypoint</h3>
+                <input type="number" id="waypointLat" placeholder="Waypoint Latitude" step="0.000001">
+                <input type="number" id="waypointLon" placeholder="Waypoint Longitude" step="0.000001">
+                <button onclick="addWaypoint()">Add Waypoint</button>
+            </div>
+            <div class="waypoint-list" id="waypointList"></div>
+            <button onclick="startFlight()" style="margin-top: 20px;">Start Flight</button>
+            <button onclick="pauseFlight()" style="margin-top: 10px;">Pause Flight</button>
+            <button onclick="resumeFlight()" style="margin-top: 10px;">Resume Flight</button>
+        </div>
+        <div class="display-panel">
+            <h2>Flight Display</h2>
+            <div class="data-display">
+                <div class="data-item">
+                    <label>ICAO Hex</label>
+                    <span id="icaoHex">-</span>
+                </div>
+                <div class="data-item">
+                    <label>Airspeed (knots)</label>
+                    <span id="airspeed">-</span>
+                </div>
+                <div class="data-item">
+                    <label>Heading (degrees)</label>
+                    <span id="heading">-</span>
+                </div>
+                <div class="data-item">
+                    <label>Altitude (feet)</label>
+                    <span id="altitude">-</span>
+                </div>
+                <div class="data-item">
+                    <label>Latitude</label>
+                    <span id="latitude">-</span>
+                </div>
+                <div class="data-item">
+                    <label>Longitude</label>
+                    <span id="longitude">-</span>
+                </div>
+                <div class="data-item" style="grid-column: 1 / span 2;">
+                    <label>ADS-B Raw Message</label>
+                    <span id="adsbMessage"></span>
+                </div>
+                <div class="data-item" style="grid-column: 1 / span 2;">
+                    <label>Decoded ADS-B Data</label>
+                    <pre id="decodedAdsb"></pre>
+                </div>
+            </div>
+            <div id="flightPath"></div>
+        </div>
+    </div>
+
+    <!-- Mapbox GL JS Library -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script>
+        // Initialize Mapbox
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZDhyaDhyIiwiYSI6ImNtNTl2ZDZhZTBjdjYya29mbDBhaGJndmwifQ.hd3AFU6R8ZC8PlgbCKgsiQ'; // Replace with your actual token
+
+        const MAPBOX_STYLE = 'mapbox://styles/mapbox/satellite-streets-v11'; // Mapbox Style
+
+        let map;
+        let aircraft = null;
+        let waypoints = [];
+        let flightInterval;
+        let currentWaypointIndex = 0;
+        let flightPathCoordinates = [];
+        let icaoHex; // Changed from 'const' to 'let'
+        let flightState = {};
+        let isPaused = false;
+        const KNOTS_TO_KM = 1.852;
+        const UPDATE_INTERVAL = 1000; // in milliseconds
+        const CRUISE_SPEED = 480; // in knots
+
+        window.onload = function () {
+            initializeMap();
+            icaoHex = generateICAOHex();
+            document.getElementById('icaoHex').textContent = icaoHex;
+        };
+
+        function initializeMap() {
+            // Initialize the Mapbox map centered at [longitude, latitude] with zoom level 12
+            const startLatitude = -37.8136;
+            const startLongitude = 144.9631;
+            const desiredZoomLevel = 5; // Adjust as needed
+
+            map = new mapboxgl.Map({
+                container: 'flightPath', // ID of the HTML element
+                style: MAPBOX_STYLE,
+                center: [startLongitude, startLatitude], // [longitude, latitude]
+                zoom: desiredZoomLevel
+            });
+
+            // Add navigation controls (zoom and rotation)
+            map.addControl(new mapboxgl.NavigationControl());
+
+            // Add aircraft icon once the map loads
+            map.on('load', () => {
+                addAircraftIcon();
+            });
+        }
+
+        function generateICAOHex() {
+            return Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(6, '0');
+        }
+
+        function addWaypoint() {
+            const lat = parseFloat(document.getElementById('waypointLat').value);
+            const lon = parseFloat(document.getElementById('waypointLon').value);
+            if (isNaN(lat) || isNaN(lon)) {
+                alert('Please enter valid coordinates');
+                return;
+            }
+            waypoints.push([lat, lon]);
+            updateWaypointList();
+            addWaypointMarker(lat, lon);
+            // Clear input fields after adding
+            document.getElementById('waypointLat').value = '';
+            document.getElementById('waypointLon').value = '';
+        }
+
+        function updateWaypointList() {
+            const list = document.getElementById('waypointList');
+            list.innerHTML = '';
+            waypoints.forEach((wp, index) => {
+                const item = document.createElement('div');
+                item.className = 'waypoint-item';
+                item.textContent = `Waypoint ${index + 1}: ${wp[0].toFixed(6)}, ${wp[1].toFixed(6)}`;
+                list.appendChild(item);
+            });
+        }
+
+        function addWaypointMarker(lat, lon) {
+            new mapboxgl.Marker({ color: '#00FF00' }) // Green marker for waypoints
+                .setLngLat([lon, lat])
+                .addTo(map);
+        }
+
+        function addAircraftIcon() {
+            // Add aircraft icon image to the map
+            map.loadImage('images/aircraft.png', (error, image) => { // Ensure the path is correct
+                if (error) throw error;
+                if (!map.hasImage('aircraft-icon')) {
+                    map.addImage('aircraft-icon', image);
+                }
+
+                // Add a GeoJSON source for the aircraft
+                map.addSource('aircraft', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [144.9631, -37.8136] // Initial position [lon, lat]
+                        }
+                    }
+                });
+
+                // Add a symbol layer for the aircraft
+                map.addLayer({
+                    id: 'aircraft-layer',
+                    type: 'symbol',
+                    source: 'aircraft',
+                    layout: {
+                        'icon-image': 'aircraft-icon',
+                        'icon-size': 0.5,
+                        'icon-rotation-alignment': 'map',
+                        'icon-allow-overlap': true,
+                        'icon-ignore-placement': true
+                    },
+                    paint: {
+                        'icon-color': '#FFFFFF' // Optional: Adjust if your icon supports color
+                    }
+                });
+            });
+        }
+
+        function updateAircraftPosition(newLng, newLat, heading) {
+            const aircraftSource = map.getSource('aircraft');
+            if (aircraftSource) {
+                aircraftSource.setData({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [newLng, newLat]
+                    }
+                });
+
+                // Rotate the aircraft icon
+                map.setLayoutProperty('aircraft-layer', 'icon-rotate', heading);
+            }
+        }
+
+        function drawFlightPath(coordinates) { // coordinates: Array of [lon, lat]
+            if (map.getSource('flight-path')) {
+                map.getSource('flight-path').setData({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: coordinates
+                    }
+                });
+            } else {
+                map.addSource('flight-path', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: coordinates
+                        }
+                    }
+                });
+
+                map.addLayer({
+                    id: 'flight-path-layer',
+                    type: 'line',
+                    source: 'flight-path',
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    paint: {
+                        'line-color': '#FF0000',
+                        'line-width': 2
+                    }
+                });
+            }
+        }
+
+        function startFlight() {
+            const startLat = parseFloat(document.getElementById('startLat').value);
+            const startLon = parseFloat(document.getElementById('startLon').value);
+            const endLat = parseFloat(document.getElementById('endLat').value);
+            const endLon = parseFloat(document.getElementById('endLon').value);
+            if (isNaN(startLat) || isNaN(startLon) || isNaN(endLat) || isNaN(endLon)) {
+                alert('Please enter valid coordinates');
+                return;
+            }
+
+            // Reset previous flight path and aircraft if any
+            if (flightInterval) {
+                clearInterval(flightInterval);
+            }
+            if (map.getLayer('flight-path-layer')) {
+                map.removeLayer('flight-path-layer');
+            }
+            if (map.getSource('flight-path')) {
+                map.removeSource('flight-path');
+            }
+            if (map.getLayer('aircraft-layer')) {
+                map.removeLayer('aircraft-layer');
+            }
+            if (map.getSource('aircraft')) {
+                map.removeSource('aircraft');
+            }
+
+            // Re-add aircraft icon and source
+            addAircraftIcon();
+
+            // Initialize flight state
+            isPaused = false;
+            currentWaypointIndex = 0;
+            flightState = {
+                currentPos: [startLat, startLon],
+                currentAlt: 1000, // Starting altitude at 1,000 feet
+                climbing: true
+            };
+            flightPathCoordinates = [[startLon, startLat]]; // [lon, lat]
+
+            // Update aircraft position
+            updateAircraftPosition(startLon, startLat, 0);
+
+            // Add end point to complete path
+            let completePath = [flightState.currentPos];
+            waypoints.forEach(wp => completePath.push(wp));
+            completePath.push([endLat, endLon]);
+
+            // Draw initial flight path
+            const flightPathGeoJSON = completePath.map(coord => [coord[1], coord[0]]); // Convert to [lon, lat]
+            drawFlightPath(flightPathGeoJSON);
+
+            // Fit map to flight path bounds
+            const bounds = new mapboxgl.LngLatBounds();
+            flightPathGeoJSON.forEach(coord => bounds.extend(coord));
+            map.fitBounds(bounds, { padding: 50 });
+
+            // Start flight interval
+            flightInterval = setInterval(() => {
+                if (!isPaused) {
+                    const [newPos, newAlt, newClimbing] = updateFlight(flightPathCoordinates, flightState.currentPos, flightState.currentAlt, flightState.climbing);
+                    flightState = {
+                        currentPos: newPos,
+                        currentAlt: newAlt,
+                        climbing: newClimbing
+                    };
+                }
+            }, UPDATE_INTERVAL);
+        }
+
+        function pauseFlight() {
+            isPaused = true;
+        }
+
+        function resumeFlight() {
+            isPaused = false;
+        }
+
+        function generateADSBMessage(icao, lat, lon, alt, heading, speed, onGround = false) {
+            // Define binary fields with correct bit lengths
+            const df = "10001"; // 5 bits
+            const ca = "100";    // 3 bits
+            const icaoBinary = parseInt(icao, 16).toString(2).padStart(24, '0'); // 24 bits
+            const tc = "01011";   // 5 bits
+            const mov = Math.floor(speed).toString(2).padStart(7, '0'); // 7 bits
+            const hb = "1";       // 1 bit
+            const hd = Math.floor((heading % 360)).toString(2).padStart(7, '0'); // 7 bits
+            const unknownBit = "0"; // 1 bit
+            const cprFrame = (Date.now() % 2).toString(); // 1 bit
+            
+            // Simplified latitude and longitude encoding
+            const scalar = onGround ? Math.pow(2, 19) : Math.pow(2, 17);
+            const dlat = 360.0 / (4 * 15 - 0);
+            const yz = Math.floor(scalar * ((lat % dlat) / dlat) + 0.5);
+            const latBin = (yz & (Math.pow(2, 17) - 1)).toString(2).padStart(17, '0'); // 17 bits
+            
+            const nl = Math.max(Math.floor(2 * Math.PI * Math.pow(Math.acos(1 - (1 - Math.cos(Math.PI / (2 * 15))) / Math.pow(Math.cos(Math.PI / 180 * Math.abs(lat)), 2)), -1)), 1);
+            const dlon = 360.0 / nl;
+            const xz = Math.floor(scalar * ((lon % dlon) / dlon) + 0.5);
+            const lonBin = (xz & (Math.pow(2, 17) - 1)).toString(2).padStart(17, '0'); // 17 bits
+            
+            const pi = Math.floor(Math.random() * Math.pow(2, 24)).toString(2).padStart(24, '0'); // 24 bits
+            
+            // Concatenate all binary fields to form the ADS-B message
+            const binaryMessage = df + ca + icaoBinary + tc + mov + hb + hd + unknownBit + cprFrame + latBin + lonBin + pi; // Total: 5+3+24+5+7+1+7+1+1+17+17+24 = 101 bits
+            
+            // Convert binaryMessage to hexadecimal using BigInt
+            const hexMessage = BigInt('0b' + binaryMessage).toString(16).toUpperCase().padStart(Math.ceil(binaryMessage.length / 4), '0');
+            
+            // Update Display Elements
+            document.getElementById('heading').textContent = heading.toFixed(1);
+            document.getElementById('altitude').textContent = Math.round(alt);
+            document.getElementById('latitude').textContent = lat.toFixed(6);
+            document.getElementById('longitude').textContent = lon.toFixed(6);
+            document.getElementById('airspeed').textContent = Math.round(speed);
+            
+            return {
+                binary: binaryMessage,
+                hex: hexMessage
+            };
+        }
+
+        function decodeADSBMessage(binary, hex) {
+            // Define the bit positions based on the generateADSBMessage function
+            const df = binary.slice(0, 5);
+            const ca = binary.slice(5, 8);
+            const icao = hex.slice(0, 6);
+            const tc = binary.slice(8, 13);
+            const mov = parseInt(binary.slice(13, 20), 2);
+            const hb = binary.slice(20, 21);
+            const hd = parseInt(binary.slice(21, 28), 2);
+            const unknownBit = binary.slice(28, 29);
+            const cprFrame = binary.slice(29, 30);
+            const latBin = parseInt(binary.slice(30, 47), 2);
+            const lonBin = parseInt(binary.slice(47, 64), 2);
+            const pi = binary.slice(64, 88);
+            
+            // Decode fields (simplified for simulation purposes)
+            return {
+                "Downlink Format (DF)": df,
+                "Capability (CA)": ca,
+                "ICAO Address": icao,
+                "Type Code (TC)": tc,
+                "Airspeed": mov + " knots",
+                "Heading": hd + " degrees",
+                "Altitude Encoding": latBin + " feet", // Simplified
+                "Latitude Encoding": latBin,
+                "Longitude Encoding": lonBin,
+                "Position Integrity (PI)": pi
+            };
+        }
+
+        function updateFlight(flightPath, currentPos, currentAlt, climbing) {
+            let target;
+            if (currentWaypointIndex < flightPath.length - 1) {
+                target = flightPath[currentWaypointIndex + 1];
+            } else {
+                clearInterval(flightInterval);
+                return [currentPos, currentAlt, climbing];
+            }
+            const heading = calculateHeading(currentPos[0], currentPos[1], target[0], target[1]);
+            const speedKmPerSecond = (CRUISE_SPEED * KNOTS_TO_KM) / 3600; // Convert knots to km/s
+            const newPos = moveAircraft(currentPos, target, speedKmPerSecond);
+            
+            // Bounds Checking
+            const lat = newPos[0];
+            const lon = newPos[1];
+            if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                console.error('Aircraft moved out of bounds:', newPos);
+                clearInterval(flightInterval);
+                return [currentPos, currentAlt, climbing];
+            }
+            
+            console.log(`Moving to new position: Latitude ${lat}, Longitude ${lon}`);
+            
+            // Update aircraft position and heading on the map
+            updateAircraftPosition(lon, lat, heading);
+            flightPathCoordinates.push([lon, lat]);
+            drawFlightPath(flightPathCoordinates);
+            
+            // Update ADS-B Messages
+            const onGround = currentAlt < 100;
+            const adsbData = generateADSBMessage(icaoHex, lat, lon, currentAlt, heading, CRUISE_SPEED, onGround);
+            
+            // Decode ADS-B data
+            const decodedData = decodeADSBMessage(adsbData.binary, adsbData.hex);
+            let decodedDisplay = '';
+            for (const [key, value] of Object.entries(decodedData)) {
+                decodedDisplay += `${key}: ${value}\n`;
+            }
+            
+            document.getElementById('adsbMessage').textContent = `Binary: ${adsbData.binary}\nHex: ${adsbData.hex}`;
+            document.getElementById('decodedAdsb').textContent = decodedDisplay;
+            
+            // Check if reached target
+            const distanceToTarget = calculateDistance(lat, lon, target[0], target[1]);
+            if (distanceToTarget < 0.1) { // Within 100 meters
+                currentWaypointIndex++;
+                if (currentWaypointIndex === flightPath.length - 1) {
+                    climbing = false;
+                }
+            }
+            if (climbing && currentAlt < 30000) {
+                currentAlt += 500; // Increase altitude by 500 feet per update
+            } else if (!climbing && currentAlt > 0) {
+                currentAlt -= 500; // Decrease altitude by 500 feet per update
+            }
+            return [newPos, currentAlt, climbing];
+        }
+
+        function calculateHeading(lat1, lon1, lat2, lon2) {
+            const phi1 = lat1 * Math.PI / 180;
+            const phi2 = lat2 * Math.PI / 180;
+            const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+            const y = Math.sin(deltaLambda) * Math.cos(phi2);
+            const x = Math.cos(phi1) * Math.sin(phi2) - 
+                      Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+            const theta = Math.atan2(y, x);
+            return (theta * 180 / Math.PI + 360) % 360;
+        }
+
+        function moveAircraft(current, target, speed) {
+            const R = 6371; // Earth's radius in kilometers
+            const d = speed / R;
+            const lat1 = current[0] * Math.PI / 180;
+            const lon1 = current[1] * Math.PI / 180;
+            const lat2 = target[0] * Math.PI / 180;
+            const lon2 = target[1] * Math.PI / 180;
+            const bearing = Math.atan2(Math.sin(lon2 - lon1) * Math.cos(lat2), 
+                                       Math.cos(lat1) * Math.sin(lat2) - 
+                                       Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
+            const newLat = Math.asin(Math.sin(lat1) * Math.cos(d) + 
+                                     Math.cos(lat1) * Math.sin(d) * Math.cos(bearing));
+            const newLon = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(d) * Math.cos(lat1), 
+                                            Math.cos(d) - Math.sin(lat1) * Math.sin(newLat));
+            return [newLat * 180 / Math.PI, newLon * 180 / Math.PI];
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth radius in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in kilometers
+        }
+    </script>
+</body>
+</html>

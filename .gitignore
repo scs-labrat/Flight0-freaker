@@ -1,0 +1,63 @@
+# Ignore Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+
+# Ignore distribution / packaging
+dist/
+build/
+*.egg-info/
+*.dist-info/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ignore virtual environment directories
+venv/
+env/
+.venv/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Ignore IDE configuration files
+.vscode/
+.idea/
+
+# Ignore log files
+*.log
+*.log.*
+
+# Ignore sensitive files (like database files or configuration files with secrets)
+*.db
+*.sqlite
+config.ini
+*.env
+
+# Ignore ANSI art files if they are considered temporary or not part of the main project
+art/*.ans
+
+# Ignore any other temporary or generated files
+*.tmp
+*.bak
+*.swp
+
+# Ignore Python's virtual environment files
+Pipfile.lock
+requirements.txt
+
+# Ignore test output files
+test-output/
+
+# Ignore the compiled Python files for the blessed library
+blessed/.pybuild/
+
+# If you're using any other specific tools or libraries, you might want to add their ignore patterns here

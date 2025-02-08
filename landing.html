@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landing Page Background</title>
+    <style>
+      @font-face {
+        font-family: 'COCOGOOSE';
+        src: url('https://raw.githubusercontent.com/gui365/PhillyScraper/master/public/styles/fonts/COCOGOOSE-PRO.REGULAR.TTF') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+      }
+    
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        font-family: 'COCOGOOSE', system-ui, sans-serif;
+        color: white;
+        background: var(--bg-color, #000000);
+      }
+    
+      canvas {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: -1;
+      }
+    
+      .controls {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        background: rgba(var(--ui-bg-rgb, 0, 0, 0), var(--ui-opacity, 0.5));
+        padding: 20px;
+        border-radius: 8px 0 0 0;
+        z-index: 999;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        opacity: 1;
+        width: 400px;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+        margin-top: 30px; 
+      }
+    
+      .controls.hidden {
+        transform: translateY(100%);
+      }
+    
+      .controls-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding-right: 10px;
+        margin-bottom: 10px;
+      }
+    
+      .controls-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+    
+      .controls-scroll::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 4px;
+      }
+    
+      .controls-scroll::-webkit-scrollbar-thumb {
+        background: var(--accent-color, #00ff99);
+        border-radius: 4px;
+      }
+    
+      .controls-scroll::-webkit-scrollbar-thumb:hover {
+        background: color-mix(in srgb, var(--accent-color, #00ff99) 80%, black);
+      }
+    
+      .controls-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent-color, #00ff99) rgba(0, 0, 0, 0.7);
+      }
+    
+      .credit {
+        margin-top: auto;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+        flex-shrink: 0;
+      }
+    
+      .credit a {
+        color: var(--accent-color, #00ff99);
+        text-decoration: none;
+      }
+    
+      .credit a:visited {
+        color: var(--accent-color, #00ff99);
+      }
+    
+      .control-group {
+        background: rgba(var(--ui-bg-rgb, 0, 0, 0), var(--ui-opacity, 0.5));
+        padding: 15px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+    
+      .control-group h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--accent-color, #00ff99);
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 5px;
+      }
+    
+      label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+      }
+    
+      input[type="number"], .keyboard-controls kbd {
+        font-family: system-ui, sans-serif;
+      }
+    
+      label span {
+        font-family: system-ui, sans-serif;
+      }
+    
+      label input[type="range"] {
+        flex: 1;
+      }
+    
+      label input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #555;
+        border-radius: 3px;
+        display: grid;
+        place-content: center;
+        margin: 0;
+        cursor: pointer;
+      }
+    
+      label input[type="checkbox"]::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        transform: scale(0);
+        transition: transform 0.1s ease;
+        box-shadow: inset 1em 1em var(--accent-color, #00ff99);
+        transform-origin: center;
+        clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+      }
+    
+      label input[type="checkbox"]:checked::before {
+        transform: scale(1);
+      }
+    
+      label input[type="checkbox"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 0 4px var(--accent-color, #00ff99);
+      }
+    
+      .color-inputs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+        gap: 15px;
+        align-items: start;
+        margin-bottom: 15px;
+      }
+    
+      .color-inputs label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+    
+      input[type="color"] {
+        -webkit-appearance: none;
+        width: 50px;
+        height: 50px;
+        border: none;
+        border-radius: 50%;
+        padding: 0;
+        overflow: hidden;
+        cursor: pointer;
+      }
+    
+      input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+    
+      input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 50%;
+        padding: 0;
+      }
+    
+      input[type="color"]::-moz-color-swatch {
+        border: none;
+        border-radius: 50%;
+        padding: 0;
+      }
+    
+      label input[type="color"] {
+        width: 50px;
+        height: 50px;
+      }
+    
+      .toggle-controls {
+        position: fixed; 
+        bottom: 90vh; 
+        right: 160px; 
+        background: rgba(var(--ui-bg-rgb, 0, 0, 0), var(--ui-opacity, 0.5));
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px 5px 0 0;
+        cursor: pointer;
+        z-index: 1000;
+        transition: all 0.3s ease;
+      }
+    
+      .toggle-controls.hidden {
+        transform: translateY(90vh); 
+      }
+    
+      input[type="number"] {
+        width: 70px;
+        padding: 5px;
+        background: #333;
+        color: white;
+        border: none;
+        border-radius: 5px;
+      }
+    
+      .keyboard-controls {
+        font-family: monospace !important;
+        font-size: 12px;
+        line-height: 1.5;
+        margin-bottom: 10px;
+        padding: 0;
+        list-style: none;
+      }
+    
+      .keyboard-controls li {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+    
+      .keyboard-controls kbd {
+        background: rgba(255,255,255,0.1);
+        padding: 2px 6px;
+        border-radius: 3px;
+        border: 1px solid rgba(255,255,255,0.2);
+        min-width: 20px;
+        text-align: center;
+      }
+    
+      select {
+        background: #333;
+        color: white;
+        border: none;
+        padding: 5px;
+        border-radius: 5px;
+        width: 100%;
+        cursor: pointer;
+      }
+    
+      select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--accent-color, #00ff99);
+      }
+    
+      .hide-all-ui {
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+    
+      .reset-button {
+        width: 100%;
+        padding: 10px;
+        background: #333;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+        transition: background 0.3s ease;
+      }
+    
+      .reset-button:hover {
+        background: #444;
+      }
+    
+      .confirmation-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 2000;
+      }
+    
+      .confirmation-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    
+      .confirmation-dialog {
+        background: rgba(var(--ui-bg-rgb, 0, 0, 0), var(--ui-opacity, 0.5));
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        transform: scale(0.9);
+        opacity: 0;
+        transition: all 0.3s ease;
+      }
+    
+      .confirmation-overlay.active .confirmation-dialog {
+        transform: scale(1);
+        opacity: 1;
+      }
+    
+      .confirmation-dialog h3,
+      .confirmation-dialog p {
+        color: white;
+      }
+    
+      .confirmation-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        justify-content: center;
+      }
+    
+      .confirmation-buttons button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+    
+      .confirm-yes {
+        background: var(--accent-color, #00ff99);
+        color: black;
+      }
+    
+      .confirm-yes:hover {
+        background: color-mix(in srgb, var(--accent-color, #00ff99) 80%, black);
+      }
+    
+      .confirm-no {
+        background: #333;
+        color: white;
+      }
+    
+      .confirm-no:hover {
+        background: #444;
+      }
+    
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        background: transparent;
+      }
+    
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: var(--accent-color, #00ff99);
+        cursor: pointer;
+        margin-top: -6px;
+      }
+    
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+      }
+    
+      input[type="range"]:focus {
+        outline: none;
+      }
+    
+      input[type="range"]::-moz-range-thumb {
+        height: 16px;
+        width: 16px;
+        border-radius: 50%;
+        background: var(--accent-color, #00ff99);
+        cursor: pointer;
+        border: none;
+      }
+    
+      input[type="range"]::-moz-range-track {
+        width: 100%;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+      }
+    </style>
+</head>
+<body>
+    <canvas id="backgroundCanvas"></canvas>
+    
+    <button class="toggle-controls">Toggle settings ▼</button>
+    <div class="controls">
+      <div class="controls-scroll">
+        <div class="control-group">
+          <h3>Pattern</h3>
+          <label>
+            Type:
+            <select id="pattern">
+              <option value="circles">Circles</option>
+              <option value="squares">Squares</option>
+              <option value="triangles">Triangles</option>
+              <option value="spiral">Spiral</option>
+              <option value="grid">Grid</option>
+              <option value="hexagons">Hexagons</option>
+              <option value="waves">Waves</option>
+              <option value="diamonds">Diamonds</option>
+              <option value="starburst">Starburst</option>
+              <option value="maze">Maze</option>
+              <option value="rings">Rings</option>
+              <option value="zigzag">Zigzag</option>
+              <option value="cells">Cells</option>
+              <option value="pinwheel">Pinwheel</option>
+              <option value="rainfall">Rainfall</option>
+              <option value="smoke">Smoke</option>
+              <option value="fire">Fire</option>
+              <option value="bubbles">Bubbles</option>
+            </select>
+          </label>
+        </div>
+    
+        <div class="control-group">
+          <h3>Shapes</h3>
+          <label>
+            Size:
+            <input type="range" id="size" min="10" max="100" value="30">
+          </label>
+          <label>
+            Speed:
+            <input type="range" id="speed" min="1" max="40" value="5">
+          </label>
+        </div>
+    
+        <div class="control-group">
+          <h3>Force</h3>
+          <label>
+            Radius:
+            <input type="range" id="forceRadius" min="50" max="2000" value="500">
+            <input type="number" id="forceRadiusNumber" min="50" max="2000" value="500">
+          </label>
+          <label>
+            <input type="checkbox" id="forceFieldOnly">
+            No animations
+          </label>
+          <label>
+            <input type="checkbox" id="showForceRadius">
+            Show Force Radius
+          </label>
+          <label>
+            <input type="checkbox" id="showForcePoints">
+            Show Force Points
+          </label>
+          <label>
+            <input type="checkbox" id="enableForcePointForces" checked>
+            Enable Force Point Forces
+          </label>
+          <label>
+            <input type="checkbox" id="enableMouseForce" checked>
+            Enable Mouse Force
+          </label>
+          <label>
+            Mouse Force Multiplier:
+            <input type="range" id="mouseForceMultiplier" min="1" max="10" value="3">
+            <span id="mouseForceMultiplierValue">3x</span>
+          </label>
+        </div>
+    
+        <div class="control-group">
+          <h3>Colors</h3>
+          <div class="color-inputs">
+            <label>
+              <input type="color" id="color1" value="#ff0000">
+              Primary
+            </label>
+            <label>
+              <input type="color" id="color2" value="#0000ff">
+              Secondary
+            </label>
+            <label>
+              <input type="color" id="accentColor" value="#00ff99">
+              Accent
+            </label>
+            <label>
+              <input type="color" id="uiBgColor" value="#000000">
+              Theme BG
+            </label>
+          </div>
+          <label>
+            UI Opacity:
+            <input type="range" id="uiOpacity" min="0" max="100" value="50">
+            <span id="uiOpacityValue">50%</span>
+          </label>
+          <label>
+            Gradient Direction:
+            <select id="gradientDirection">
+              <option value="ltr">Left to right</option>
+              <option value="rtl">Right to left</option>
+              <option value="trtl">Top right to top left</option>
+              <option value="bltr">Bottom left to top right</option>
+              <option value="centerPrimary">Center out (primary center)</option>
+              <option value="centerSecondary">Center out (secondary center)</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" id="rainbowMode" checked>
+            Rainbow Mode
+          </label>
+        </div>
+    
+        <div class="control-group">
+          <h3>Shortcuts</h3>
+          <ul class="keyboard-controls">
+            <li><kbd>F</kbd> Create force point</li>
+            <li><kbd>R</kbd> Remove all force points</li>
+            <li><kbd>E</kbd> Next type</li>
+            <li><kbd>Q</kbd> Previous type</li>
+            <li><kbd>B</kbd> Toggle rainbow</li>
+            <li><kbd>J</kbd> Decrease size</li>
+            <li><kbd>L</kbd> Increase size</li>
+            <li><kbd>O</kbd> Decrease speed</li>
+            <li><kbd>P</kbd> Increase speed</li>
+            <li><kbd>M</kbd> Toggle No Animations mode</li>
+            <li><kbd>Z</kbd> Decrease force radius</li>
+            <li><kbd>X</kbd> Increase force radius</li>
+            <li><kbd>F2</kbd> Toggle all UI</li>
+          </ul>
+        </div>
+        
+        <button class="reset-button">Reset to defaults</button>
+      </div>
+    </div>
+    
+    <div class="confirmation-overlay">
+      <div class="confirmation-dialog">
+        <h3>Reset all controls?</h3>
+        <p>This will restore all settings to their default values.</p>
+        <div class="confirmation-buttons">
+          <button class="confirm-yes">Yes, reset</button>
+          <button class="confirm-no">Cancel</button>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+    // JavaScript Code
+
+    // Selecting elements
+    const canvas = document.getElementById('backgroundCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const sizeInput = document.getElementById('size');
+    const speedInput = document.getElementById('speed');
+    const forceRadiusInput = document.getElementById('forceRadius');
+    const forceRadiusNumber = document.getElementById('forceRadiusNumber');
+    const color1Input = document.getElementById('color1');
+    const color2Input = document.getElementById('color2');
+    const accentColorInput = document.getElementById('accentColor');
+    const uiBgColorInput = document.getElementById('uiBgColor');
+    const uiOpacityInput = document.getElementById('uiOpacity');
+    const uiOpacityValue = document.getElementById('uiOpacityValue');
+    const patternSelect = document.getElementById('pattern');
+    const forceFieldOnlyInput = document.getElementById('forceFieldOnly');
+    const showForceRadiusInput = document.getElementById('showForceRadius');
+    const showForcePointsInput = document.getElementById('showForcePoints');
+    const enableForcePointForcesInput = document.getElementById('enableForcePointForces');
+    const enableMouseForceInput = document.getElementById('enableMouseForce');
+    const rainbowModeInput = document.getElementById('rainbowMode');
+    const gradientDirectionSelect = document.getElementById('gradientDirection');
+    const mouseForceMultiplierInput = document.getElementById('mouseForceMultiplier');
+    const mouseForceMultiplierValue = document.getElementById('mouseForceMultiplierValue');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    let time = 0;
+
+    let mouseX = 0;
+    let mouseY = 0;
+    let isMouseDown = false;
+    let dots = [];
+    let forcePoints = [];
+
+    // Event listeners for mouse interactions
+    canvas.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    canvas.addEventListener('mousedown', () => isMouseDown = true);
+    canvas.addEventListener('mouseup', () => isMouseDown = false);
+    canvas.addEventListener('mouseleave', () => isMouseDown = false);
+
+    // Update mouse force multiplier display
+    mouseForceMultiplierInput.addEventListener('input', () => {
+      mouseForceMultiplierValue.textContent = `${mouseForceMultiplierInput.value}x`;
+    });
+
+    // Dot class
+    class Dot {
+      constructor(x, y, size) {
+        this.originX = x;
+        this.originY = y;
+        this.x = x;
+        this.y = y;
+        this.size = size;
+        this.vx = 0;
+        this.vy = 0;
+      }
+
+      update() {
+        const forceFactor = parseInt(forceRadiusInput.value);
+        const speedFactor = parseInt(speedInput.value) / 5;
+
+        if (enableMouseForceInput.checked) {
+          const dx = mouseX - this.x;
+          const dy = mouseY - this.y;
+          let distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < forceFactor) {
+            const force = (forceFactor - distance) / forceFactor;
+            const angle = Math.atan2(dy, dx);
+            const multiplier = isMouseDown ? parseInt(mouseForceMultiplierInput.value) : 1;
+            const repelX = Math.cos(angle) * force * -8 * speedFactor * multiplier;
+            const repelY = Math.sin(angle) * force * -8 * speedFactor * multiplier;
+            this.vx += repelX;
+            this.vy += repelY;
+          }
+        }
+
+        if (enableForcePointForcesInput.checked) {
+          forcePoints.forEach(point => {
+            const dx = point.x - this.x;
+            const dy = point.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < forceFactor) {
+              const force = (forceFactor - distance) / forceFactor;
+              const angle = Math.atan2(dy, dx);
+              const repelX = Math.cos(angle) * force * -8 * speedFactor;
+              const repelY = Math.sin(angle) * force * -8 * speedFactor;
+              this.vx += repelX;
+              this.vy += repelY;
+            }
+          });
+        }
+
+        const springX = (this.originX - this.x) * 0.1 * speedFactor;
+        const springY = (this.originY - this.y) * 0.1 * speedFactor;
+        
+        this.vx += springX;
+        this.vy += springY;
+        
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+        
+        this.x += this.vx;
+        this.y += this.vy;
+      }
+    }
+
+    // Drawing functions
+    function drawCircle(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawSquare(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, size, size);
+    }
+
+    function drawTriangle(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x + size / 2, y);
+      ctx.lineTo(x + size, y + size);
+      ctx.lineTo(x, y + size);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawSpiral(x, y, size, color, angle) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size / 10;
+      ctx.beginPath();
+      ctx.arc(x, y, size / 2, angle, angle + Math.PI / 2);
+      ctx.stroke();
+    }
+
+    function drawHexagon(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI) / 3;
+        const xPos = x + size * Math.cos(angle);
+        const yPos = y + size * Math.sin(angle);
+        if (i === 0) ctx.moveTo(xPos, yPos);
+        else ctx.lineTo(xPos, yPos);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawWave(x, y, size, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size / 4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + size / 2, y + size, x + size, y);
+      ctx.stroke();
+    }
+
+    function drawDiamond(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x + size / 2, y);
+      ctx.lineTo(x + size, y + size / 2);
+      ctx.lineTo(x + size / 2, y + size);
+      ctx.lineTo(x, y + size / 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawStarburst(x, y, size, color, points = 8) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const radius = i % 2 === 0 ? size : size / 2;
+        const angle = (i * Math.PI) / points;
+        const xPos = x + radius * Math.cos(angle);
+        const yPos = y + radius * Math.sin(angle);
+        if (i === 0) ctx.moveTo(xPos, yPos);
+        else ctx.lineTo(xPos, yPos);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawRaindrop(x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.bezierCurveTo(
+        x - size / 4, y + size / 2,
+        x - size / 4, y + size / 2,
+        x, y + size
+      );
+      ctx.bezierCurveTo(
+        x + size / 4, y + size / 2,
+        x + size / 4, y + size / 2,
+        x, y
+      );
+      ctx.fill();
+    }
+
+    function drawSmokeParticle(x, y, size, color, alpha) {
+      ctx.fillStyle = `rgba(${color}, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawFireParticle(x, y, size, color1, color2, alpha) {
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+      gradient.addColorStop(0, `rgba(${color1}, ${alpha})`);
+      gradient.addColorStop(1, `rgba(${color2}, 0)`);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawBubble(x, y, size, color) {
+      const rgb = color.match(/\d+/g);
+      
+      const gradient = ctx.createRadialGradient(
+        x - size / 3, y - size / 3, size / 10,
+        x, y, size
+      );
+      gradient.addColorStop(0, 'rgba(255,255,255,0.8)');
+      gradient.addColorStop(0.2, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.267)`);
+      gradient.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.067)`);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.arc(x - size / 3, y - size / 3, size / 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawRings(x, y, size, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size / 8;
+      ctx.beginPath();
+      ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, size / 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawZigzag(x, y, size, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size / 4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + size / 2, y + size / 2);
+      ctx.lineTo(x + size, y);
+      ctx.lineTo(x + size * 1.5, y + size / 2);
+      ctx.stroke();
+    }
+
+    function drawCell(x, y, size, color) {
+      ctx.fillStyle = color;
+      const radius = size / 2;
+      ctx.beginPath();
+      ctx.arc(x + radius, y + radius, radius * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x + radius, y + radius, radius * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+    }
+
+    function drawPinwheel(x, y, size, color, rotation) {
+      ctx.fillStyle = color;
+      for (let i = 0; i < 4; i++) {
+        ctx.save();
+        ctx.translate(x + size / 2, y + size / 2);
+        ctx.rotate(rotation + (i * Math.PI / 2));
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(size / 2, -size / 4);
+        ctx.lineTo(size / 2, size / 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function getRainbowColor(x, y) {
+      const hue = (Math.atan2(y - height / 2, x - width / 2) * 180 / Math.PI + 180) % 360;
+      return `hsl(${hue}, 100%, 50%)`;
+    }
+
+    function getGradientColor(x, y, direction) {
+      let factor = 0;
+      
+      switch(direction) {
+        case 'ltr':
+          factor = x / width;
+          break;
+        case 'rtl':
+          factor = 1 - (x / width);
+          break;
+        case 'trtl':
+          factor = 1 - ((x + y) / (width + height));
+          break;
+        case 'bltr':
+          factor = ((x + (height - y)) / (width + height));
+          break;
+        case 'centerPrimary':
+          const distFromCenter = Math.sqrt(Math.pow(x - width / 2, 2) + Math.pow(y - height / 2, 2));
+          const maxDist = Math.sqrt(Math.pow(width / 2, 2) + Math.pow(height / 2, 2));
+          factor = distFromCenter / maxDist;
+          break;
+        case 'centerSecondary':
+          const distFromCenter2 = Math.sqrt(Math.pow(x - width / 2, 2) + Math.pow(y - height / 2, 2));
+          const maxDist2 = Math.sqrt(Math.pow(width / 2, 2) + Math.pow(height / 2, 2));
+          factor = 1 - (distFromCenter2 / maxDist2);
+          break;
+      }
+      return interpolateColors(color1Input.value, color2Input.value, factor);
+    }
+
+    // Generate pattern function
+    function generatePattern() { 
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.fillRect(0, 0, width, height);
+      const size = parseInt(sizeInput.value);
+      const speed = parseInt(speedInput.value) / 100;
+      const pattern = patternSelect.value;
+      const forceFieldOnly = forceFieldOnlyInput.checked;
+
+      if (dots.length === 0) {
+        for (let x = 0; x < width; x += size) {
+          for (let y = 0; y < height; y += size) {
+            dots.push(new Dot(x, y, size));
+          }
+        }
+      }
+
+      dots.forEach(dot => dot.update());
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, width, height);
+
+      forcePoints.forEach(point => {
+        if (showForcePointsInput.checked) {
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+        }
+        
+        if (showForceRadiusInput.checked) {
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, parseInt(forceRadiusInput.value), 0, Math.PI * 2);
+          ctx.strokeStyle = `#ffffff33`;
+          ctx.stroke();
+        }
+      });
+
+      if (forceFieldOnly) {
+        dots.forEach(dot => {
+          const color = rainbowModeInput.checked ? 
+            getRainbowColor(dot.x, dot.y) : 
+            getGradientColor(dot.x, dot.y, gradientDirectionSelect.value);
+          switch (pattern) {
+            case 'circles':
+              drawCircle(dot.x, dot.y, size / 2, color);
+              break;
+            case 'squares':
+              drawSquare(dot.x, dot.y, size / 2, color);
+              break;
+            case 'triangles':
+              drawTriangle(dot.x, dot.y, size, color);
+              break;
+            case 'hexagons':
+              drawHexagon(dot.x + size / 2, dot.y + size / 2, size / 2, color);
+              break;
+            case 'diamonds':
+              drawDiamond(dot.x, dot.y, size, color);
+              break;
+            case 'starburst':
+              drawStarburst(dot.x + size / 2, dot.y + size / 2, size / 2, color);
+              break;
+            case 'cells':
+              drawCell(dot.x, dot.y, size, color);
+              break;
+            case 'bubbles':
+              drawBubble(dot.x, dot.y, size / 2, color);
+              break;
+            case 'rings':
+              drawRings(dot.x + size / 2, dot.y + size / 2, size, color);
+              break;
+            case 'pinwheel':
+              drawPinwheel(dot.x, dot.y, size, color, time * 2);
+              break;
+            default:
+              drawCircle(dot.x, dot.y, size / 2, color);
+          }
+        });
+        requestAnimationFrame(generatePattern);
+        return;
+      }
+
+      // Pattern rendering based on selection
+      switch (pattern) {
+        case 'circles':
+          dots.forEach(dot => {
+            const distFromCenter = Math.sqrt(Math.pow(dot.x - width / 2, 2) + Math.pow(dot.y - height / 2, 2));
+            const wave = Math.sin(distFromCenter * 0.01 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            const circleSize = dot.size * (0.2 + wave * 0.8);
+            drawCircle(dot.x, dot.y, circleSize, color);
+          });
+          break;
+
+        case 'squares':
+          dots.forEach(dot => {
+            const wave = Math.sin(dot.x * 0.02 + dot.y * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            const squareSize = dot.size * (0.2 + wave * 0.8);
+            drawSquare(dot.x, dot.y, squareSize, color);
+          });
+          break;
+
+        case 'triangles':
+          dots.forEach(dot => {
+            const wave = Math.cos(dot.x * 0.02 - dot.y * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawTriangle(dot.x, dot.y, dot.size, color);
+          });
+          break;
+
+        case 'spiral':
+          dots.forEach(dot => {
+            const angle = Math.atan2(dot.y - height / 2, dot.x - width / 2);
+            const dist = Math.sqrt(Math.pow(dot.x - width / 2, 2) + Math.pow(dot.y - height / 2, 2));
+            const wave = Math.sin(dist * 0.01 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawSpiral(dot.x, dot.y, size, color, angle + time);
+          });
+          break;
+
+        case 'grid':
+          dots.forEach(dot => {
+            const wave = Math.sin((dot.x + dot.y) * 0.01 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(dot.x, dot.y, size, size);
+          });
+          break;
+
+        case 'hexagons':
+          dots.forEach(dot => {
+            const wave = Math.sin(dot.x * 0.02 + dot.y * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawHexagon(dot.x, dot.y, size, color);
+          });
+          break;
+
+        case 'waves':
+          dots.forEach(dot => {
+            const wave = Math.sin(dot.x * 0.01 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawWave(dot.x, dot.y + Math.sin(dot.x * 0.02 + time) * 20, size, color);
+          });
+          break;
+
+        case 'diamonds':
+          dots.forEach(dot => {
+            const wave = Math.sin((dot.x + dot.y) * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawDiamond(dot.x, dot.y, size, color);
+          });
+          break;
+
+        case 'starburst':
+          dots.forEach(dot => {
+            const wave = Math.sin(Math.sqrt(dot.x * dot.x + dot.y * dot.y) * 0.01 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawStarburst(dot.x + size / 2, dot.y + size / 2, size / 2, color);
+          });
+          break;
+
+        case 'maze':
+          dots.forEach(dot => {
+            const wave = Math.sin((dot.x + dot.y) * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = size / 4;
+            if (Math.random() > 0.5) {
+              ctx.beginPath();
+              ctx.moveTo(dot.x, dot.y);
+              ctx.lineTo(dot.x + size, dot.y + size);
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.moveTo(dot.x + size, dot.y);
+              ctx.lineTo(dot.x, dot.y + size);
+              ctx.stroke();
+            }
+          });
+          break;
+
+        case 'rings':
+          dots.forEach(dot => {
+            const wave = Math.sin((dot.x + dot.y) * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawRings(dot.x + size / 2, dot.y + size / 2, size * (0.5 + wave * 0.5), color);
+          });
+          break;
+
+        case 'zigzag':
+          dots.forEach(dot => {
+            const wave = Math.sin(dot.x * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawZigzag(dot.x, dot.y, size, color);
+          });
+          break;
+
+        case 'cells':
+          dots.forEach(dot => {
+            const wave = Math.sin((dot.x * dot.y) * 0.0001 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawCell(dot.x, dot.y, size, color);
+          });
+          break;
+
+        case 'pinwheel':
+          dots.forEach(dot => {
+            const wave = Math.sin((dot.x + dot.y) * 0.02 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawPinwheel(dot.x, dot.y, size, color, time * 2);
+          });
+          break;
+
+        case 'rainfall':
+          ctx.fillStyle = 'rgba(0,0,0,0.1)';
+          ctx.fillRect(0, 0, width, height);
+          dots.forEach(dot => {
+            const wave = Math.sin(dot.x * 0.1 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawRaindrop(dot.x, dot.y, size / 2, color);
+          });
+          break;
+
+        case 'smoke':
+          ctx.fillStyle = 'rgba(0,0,0,0.1)';
+          ctx.fillRect(0, 0, width, height);
+          dots.forEach(dot => {
+            const alpha = (0.5 + Math.sin(dot.x * 0.01 + time) * 0.5) * 0.5;
+            drawSmokeParticle(dot.x, dot.y, size, '200,200,200', alpha);
+          });
+          break;
+
+        case 'fire':
+          ctx.fillStyle = 'rgba(0,0,0,0.1)';
+          ctx.fillRect(0, 0, width, height);
+          dots.forEach(dot => {
+            const alpha = 0.5 + Math.sin(dot.x * 0.01 + time) * 0.5;
+            drawFireParticle(dot.x, dot.y, size, '255,150,50', '255,50,0', alpha);
+          });
+          break;
+
+        case 'bubbles':
+          ctx.fillStyle = 'rgba(0,0,0,0.1)';
+          ctx.fillRect(0, 0, width, height);
+          dots.forEach(dot => {
+            const wave = Math.sin(dot.x * 0.1 + time) * 0.5 + 0.5;
+            const color = rainbowModeInput.checked ? getRainbowColor(dot.x, dot.y) : interpolateColors(color1Input.value, color2Input.value, wave);
+            drawBubble(dot.x, dot.y, size / 2, color);
+          });
+          break;
+      }
+      
+      time += speed;
+      requestAnimationFrame(generatePattern);
+    }
+
+    // Interpolate between two colors
+    function interpolateColors(color1, color2, factor) {
+      const r1 = parseInt(color1.substr(1,2), 16);
+      const g1 = parseInt(color1.substr(3,2), 16);
+      const b1 = parseInt(color1.substr(5,2), 16);
+      
+      const r2 = parseInt(color2.substr(1,2), 16);
+      const g2 = parseInt(color2.substr(3,2), 16);
+      const b2 = parseInt(color2.substr(5,2), 16);
+      
+      const r = Math.round(r1 + (r2 - r1) * factor);
+      const g = Math.round(g1 + (g2 - g1) * factor);
+      const b = Math.round(b1 + (b2 - b1) * factor);
+      
+      return `rgb(${r},${g},${b})`;
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      dots = [];
+    });
+
+    // Sync the inputs
+    forceRadiusInput.addEventListener('input', () => {
+      forceRadiusNumber.value = forceRadiusInput.value;
+    });
+    
+    forceRadiusNumber.addEventListener('input', () => {
+      forceRadiusInput.value = forceRadiusNumber.value;
+    });
+    
+    // Controls toggling
+    const toggleButton = document.querySelector('.toggle-controls');
+    const controls = document.querySelector('.controls');
+    let controlsVisible = true;
+    
+    let allUiVisible = true;
+    const allUiElements = [toggleButton, controls];
+    
+    toggleButton.addEventListener('click', () => {
+      controlsVisible = !controlsVisible;
+      controls.classList.toggle('hidden');
+      toggleButton.textContent = controlsVisible ? 'Toggle settings ▼' : 'Toggle settings ▲';
+    });
+    
+    // Add keyboard controls
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      
+      switch (key) {
+        case 'f':
+          forcePoints.push({ x: mouseX, y: mouseY });
+          break;
+        case 'r':
+          forcePoints = [];
+          break;
+        case 'e': {
+          const options = patternSelect.options;
+          const currentIndex = patternSelect.selectedIndex;
+          patternSelect.selectedIndex = (currentIndex + 1) % options.length;
+          break;
+        }
+        case 'q': {
+          const options = patternSelect.options;
+          const currentIndex = patternSelect.selectedIndex;
+          patternSelect.selectedIndex = (currentIndex - 1 + options.length) % options.length;
+          break;
+        }
+        case 'b':
+          rainbowModeInput.checked = !rainbowModeInput.checked;
+          break;
+        case 'j':
+          sizeInput.value = Math.max(parseInt(sizeInput.value) - 5, sizeInput.min);
+          dots = [];
+          break;
+        case 'l':
+          sizeInput.value = Math.min(parseInt(sizeInput.value) + 5, sizeInput.max);
+          dots = [];
+          break;
+        case 'o':
+          speedInput.value = Math.max(parseInt(speedInput.value) - 1, speedInput.min);
+          break;
+        case 'p':
+          speedInput.value = Math.min(parseInt(speedInput.value) + 1, speedInput.max);
+          break;
+        case 'm':
+          forceFieldOnlyInput.checked = !forceFieldOnlyInput.checked;
+          break;
+        case 'z':
+          forceRadiusInput.value = Math.max(parseInt(forceRadiusInput.value) - 50, forceRadiusInput.min);
+          forceRadiusNumber.value = forceRadiusInput.value;
+          break;
+        case 'x':
+          forceRadiusInput.value = Math.min(parseInt(forceRadiusInput.value) + 50, forceRadiusInput.max);
+          forceRadiusNumber.value = forceRadiusInput.value;
+          break;
+        case 'f2':
+          e.preventDefault();
+          allUiVisible = !allUiVisible;
+          allUiElements.forEach(element => {
+            if (allUiVisible) {
+              element.classList.remove('hide-all-ui');
+              controls.classList.remove('hidden');
+              toggleButton.textContent = 'Toggle settings ▼';
+              controlsVisible = true;
+            } else {
+              element.classList.add('hide-all-ui');
+            }
+          });
+          break;
+      }
+    });
+
+    // Reset button functionality
+    const resetButton = document.querySelector('.reset-button');
+    const confirmationOverlay = document.querySelector('.confirmation-overlay');
+    const confirmYes = document.querySelector('.confirm-yes');
+    const confirmNo = document.querySelector('.confirm-no');
+    
+    const defaultValues = {
+      size: 30,
+      speed: 5,
+      forceRadius: 500,
+      color1: '#ff0000',
+      color2: '#0000ff',
+      accentColor: '#00ff99',
+      uiBgColor: '#000000',
+      uiOpacity: 50,
+      pattern: 'circles',
+      forceFieldOnly: false,
+      showForceRadius: false,
+      showForcePoints: false,
+      enableForcePointForces: true,
+      enableMouseForce: true,
+      rainbowMode: true
+    };
+    
+    resetButton.addEventListener('click', () => {
+      confirmationOverlay.classList.add('active');
+    });
+    
+    confirmNo.addEventListener('click', () => {
+      confirmationOverlay.classList.remove('active');
+    });
+    
+    confirmYes.addEventListener('click', () => {
+      sizeInput.value = defaultValues.size;
+      speedInput.value = defaultValues.speed;
+      forceRadiusInput.value = defaultValues.forceRadius;
+      forceRadiusNumber.value = defaultValues.forceRadius;
+      color1Input.value = defaultValues.color1;
+      color2Input.value = defaultValues.color2;
+      accentColorInput.value = defaultValues.accentColor;
+      uiBgColorInput.value = defaultValues.uiBgColor;
+      uiOpacityInput.value = defaultValues.uiOpacity;
+      patternSelect.value = defaultValues.pattern;
+      forceFieldOnlyInput.checked = defaultValues.forceFieldOnly;
+      showForceRadiusInput.checked = defaultValues.showForceRadius;
+      showForcePointsInput.checked = defaultValues.showForcePoints;
+      enableForcePointForcesInput.checked = defaultValues.enableForcePointForces;
+      enableMouseForceInput.checked = defaultValues.enableMouseForce;
+      rainbowModeInput.checked = defaultValues.rainbowMode;
+      
+      updateUiBackground();
+      
+      dots = [];
+      
+      confirmationOverlay.classList.remove('active');
+    });
+    
+    confirmationOverlay.addEventListener('click', (e) => {
+      if (e.target === confirmationOverlay) {
+        confirmationOverlay.classList.remove('active');
+      }
+    });
+    
+    // Initialize accent color on page load
+    document.documentElement.style.setProperty('--accent-color', accentColorInput.value);
+    updateUiBackground();
+    
+    // Add event listener for accent color changes
+    accentColorInput.addEventListener('input', () => {
+      document.documentElement.style.setProperty('--accent-color', accentColorInput.value);
+    });
+    uiBgColorInput.addEventListener('input', updateUiBackground);
+    uiOpacityInput.addEventListener('input', updateUiBackground);
+    
+    function updateUiBackground() {
+      const color = uiBgColorInput.value;
+      const r = parseInt(color.substr(1,2), 16);
+      const g = parseInt(color.substr(3,2), 16);
+      const b = parseInt(color.substr(5,2), 16);
+      const opacity = uiOpacityInput.value / 100;
+      
+      document.documentElement.style.setProperty('--ui-bg-rgb', `${r},${g},${b}`);
+      document.documentElement.style.setProperty('--ui-opacity', opacity);
+      uiOpacityValue.textContent = `${uiOpacityInput.value}%`;
+    }
+    
+    // Start generating the pattern
+    generatePattern();
+    </script>
+</body>
+</html>

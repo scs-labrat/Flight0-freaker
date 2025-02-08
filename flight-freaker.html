@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced Flight Path Simulator</title>
+  
+  <!-- External Libraries -->
+  <script src="https://unpkg.com/mapbox-gl@2.14.1/dist/mapbox-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script> <!-- Turf.js -->
+  
+  <!-- External Stylesheets -->
+  <link href="https://unpkg.com/mapbox-gl@2.14.1/dist/mapbox-gl.css" rel="stylesheet">
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.css" rel="stylesheet">
+  
+  <!-- Internal Styles -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1a1a1a;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* Prevent scrollbars from appearing */
+    }
+    /* Map Container */
+    #map {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1; /* Base layer */
+    }
+    /* Control Panel (Left Floating Panel) */
+    .control-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 300px;
+      bottom: 20px;
+      background-color: rgba(42, 42, 42, 0.9); /* Semi-transparent */
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      z-index: 2; /* Above the map */
+      overflow-y: auto;
+      max-height: calc(100vh - 40px);
+      transition: transform 0.3s ease-in-out;
+    }
+    .control-panel.hidden {
+      transform: translateX(-100%);
+    }
+    .control-panel h2 {
+      margin-top: 0;
+      color: #61dafb;
+      text-align: center;
+      position: relative;
+    }
+   
+    .pattern-controls {
+      margin-bottom: 15px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #aaa;
+      font-size: 0.9em;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      background-color: #333;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #4CAF50;
+      color: #1a1a1a;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      font-size: 16px;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    /* ADS-B Output */
+    .data-output {
+      background-color: #2a2a2a;
+      padding: 10px;
+      border-radius: 10px;
+      margin-top: 20px;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: #fff;
+      overflow-y: auto;
+      max-height: 200px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    /* Live Data Panel (Right Floating Panel) */
+    .display-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 300px;
+      background-color: rgba(42, 42, 42, 0.9); /* Semi-transparent */
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      z-index: 2; /* Above the map */
+      overflow-y: auto;
+      max-height: calc(100vh - 40px);
+      transition: transform 0.3s ease-in-out;
+    }
+    .display-panel.hidden {
+      transform: translateX(100%);
+    }
+    .display-panel h3 {
+      margin-top: 0;
+      color: #61dafb;
+      text-align: center;
+      position: relative;
+    }
+    /* Close Button for Live Data Panel */
+    .display-panel .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .data-display {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .data-item {
+      background-color: #333;
+      padding: 10px;
+      border-radius: 5px;
+      word-wrap: break-word;
+    }
+    .data-item label {
+      display: block;
+      font-size: 0.8em;
+      color: #aaa;
+    }
+    .data-item span {
+      font-size: 1.1em;
+      font-weight: bold;
+      font-family: monospace;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    /* Waypoint List Styling */
+    .waypoint-list {
+      margin-top: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .waypoint-item {
+      background-color: #333;
+      padding: 5px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-family: monospace;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    /* Aircraft Icon Transition */
+    .plane-icon {
+      transition: transform 1s linear;
+    }
+    /* ADS-B Messages Styling */
+    #adsbMessage {
+      font-family: monospace;
+      font-size: 0.9em;
+      word-break: break-all;
+      white-space: pre-wrap;
+      color: #fff;
+    }
+    #decodedAdsb {
+      font-family: monospace;
+      font-size: 0.9em;
+      white-space: pre-wrap;
+      color: #aaa;
+    }
+    /* Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(26, 26, 26, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #61dafb;
+      font-size: 24px;
+      z-index: 3; /* Above all other elements */
+      display: none;
+    }
+    /* Toggle Buttons */
+    .toggle-btn {
+      position: fixed;
+      top: 20px;
+      width: 40px;
+      height: 40px;
+      background-color: rgba(42, 42, 42, 0.9);
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 3; /* Above the map and panels */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      transition: background-color 0.3s ease;
+    }
+    .toggle-btn:hover {
+      background-color: rgba(42, 42, 42, 1);
+    }
+    #toggleControlPanel {
+      left: 20px;
+    }
+    #toggleDisplayPanel {
+      right: 20px;
+    }
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .control-panel, .display-panel {
+        width: 90%;
+        left: 5%;
+        right: 5%;
+      }
+      .display-panel {
+        top: auto;
+        bottom: 20px;
+      }
+      .toggle-btn {
+        top: 80px; /* Adjust position for mobile if needed */
+      }
+      #toggleDisplayPanel {
+        right: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Map Container -->
+  <div id="map"></div>
+  
+  <!-- Left Floating Control Panel -->
+  <div class="control-panel" id="controlPanel">
+    <h2>Flight Freaker
+    </h2>
+    
+    <div class="form-group">
+      <label for="patternType">Pattern Type</label>
+      <select id="patternType" onchange="FlightSimulator.updatePatternControls()">
+        <option value="circle">Circle Location</option>
+        <option value="follow">Follow Aircraft</option>
+        <option value="search">Search Pattern</option>
+        <option value="custom">Custom Path</option>
+      </select>
+    </div>
+
+    <!-- Circle Controls -->
+    <div id="circleControls" class="pattern-controls">
+      <div class="form-group">
+        <label for="circleLat">Center Latitude</label>
+        <input type="number" id="circleLat" step="0.000001" value="51.500722" required>
+      </div>
+      <div class="form-group">
+        <label for="circleLon">Center Longitude</label>
+        <input type="number" id="circleLon" step="0.000001" value="-0.124462" required>
+      </div>
+      <div class="form-group">
+        <label for="circleRadius">Radius (meters)</label>
+        <input type="number" id="circleRadius" value="1000" min="100" required>
+      </div>
+    </div>
+
+    <!-- Follow Controls -->
+    <div id="followControls" class="pattern-controls" style="display: none;">
+      <div class="form-group">
+        <label for="targetIcao">Target ICAO</label>
+        <input type="text" id="targetIcao" placeholder="Enter ICAO code" pattern="^[A-Z0-9]{4}$" title="Enter a valid 4-character alphanumeric ICAO code" required disabled>
+      </div>
+      <div class="form-group">
+        <label for="followDistance">Following Distance (NM)</label>
+        <input type="number" id="followDistance" value="2" min="1" required disabled>
+      </div>
+    </div>
+
+    <!-- Search Controls -->
+    <div id="searchControls" class="pattern-controls" style="display: none;">
+      <div class="form-group">
+        <label for="searchType">Search Pattern</label>
+        <select id="searchType" disabled required>
+          <option value="square">Expanding Square</option>
+          <option value="parallel">Parallel Sweep</option>
+          <option value="sector">Sector Search</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="searchArea">Area Size (km)</label>
+        <input type="number" id="searchArea" value="5" min="1" required disabled>
+      </div>
+      <div class="form-group">
+        <label for="searchStartLat">Starting Point Latitude</label>
+        <input type="number" id="searchStartLat" step="0.000001" value="51.500722" required disabled>
+      </div>
+      <div class="form-group">
+        <label for="searchStartLon">Starting Point Longitude</label>
+        <input type="number" id="searchStartLon" step="0.000001" value="-0.124462" required disabled>
+      </div>
+    </div>
+
+    <!-- Custom Controls -->
+    <div id="customControls" class="pattern-controls" style="display: none;">
+      <div class="form-group">
+        <label for="customMode">Custom Path Mode</label>
+        <select id="customMode" onchange="FlightSimulator.toggleCustomMode()" disabled required>
+          <option value="draw">Draw on Map</option>
+          <option value="coordinates">Enter Coordinates</option>
+        </select>
+      </div>
+      <div id="customDrawControls" class="form-group" style="display: none;">
+        <button onclick="FlightSimulator.enableDrawMode()">Start Drawing</button>
+      </div>
+      <div id="customCoordinatesControls" class="form-group" style="display: none;">
+        <label for="customCoordinates">Enter Coordinates (JSON Array)</label>
+        <textarea id="customCoordinates" rows="5" placeholder='e.g., [[-0.124462,51.500722], [-0.125,51.501], ...]' disabled required></textarea>
+      </div>
+    </div>
+
+    <!-- Common Controls -->
+    <div class="form-group">
+      <label for="altitude">Altitude (ft)</label>
+      <input type="number" id="altitude" value="5000" min="1000" required>
+    </div>
+
+    <div class="form-group">
+      <label for="speed">Speed (knots)</label>
+      <input type="number" id="speed" value="120" min="10" required>
+    </div>
+
+    <button onclick="FlightSimulator.generatePath()">Generate Flight Path</button>
+
+    <div class="data-output">
+      <h3>ADS-B Output</h3>
+      <pre id="adsb-output">Waiting for flight path generation...</pre>
+    </div>
+  </div>
+
+  <!-- Right Floating Live Data Panel -->
+  <div class="display-panel" id="displayPanel">
+    <h3>Live Data
+    </h3>
+    <div class="data-display" id="live-data">
+      <div class="data-item">
+        <label>Latitude:</label>
+        <span>--</span>
+      </div>
+      <div class="data-item">
+        <label>Longitude:</label>
+        <span>--</span>
+      </div>
+      <div class="data-item">
+        <label>Altitude:</label>
+        <span>-- ft</span>
+      </div>
+      <div class="data-item">
+        <label>Speed:</label>
+        <span>-- kts</span>
+      </div>
+      <div class="data-item">
+        <label>Heading:</label>
+        <span>--°</span>
+      </div>
+      <div class="data-item">
+        <label>Timestamp:</label>
+        <span>--</span>
+      </div>
+      <div class="data-item">
+        <label>ICAO:</label>
+        <span>--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toggle Buttons for Panels -->
+  <button class="toggle-btn" id="toggleControlPanel" onclick="FlightSimulator.togglePanel('control')">&#9776;</button>
+  <button class="toggle-btn" id="toggleDisplayPanel" onclick="FlightSimulator.togglePanel('display')">&#9881;</button>
+
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay">Loading...</div>
+
+  <!-- Internal Scripts -->
+  <script>
+    (function() {
+      // Encapsulate all functionality within the FlightSimulator object
+      const FlightSimulator = {
+        map: null,
+        draw: null,
+        currentPath: null,
+        simulation: null,
+        aircraftMarker: null,
+        lineString: null, // Turf.js LineString
+        totalDistance: 0, // Total distance of the path in meters
+        currentDistance: 0, // Current distance traveled along the path
+        speedMps: 0, // Speed in meters per second
+        simulationInterval: 100, // Simulation interval in milliseconds
+        isLooping: true, // Whether to loop the simulation
+        adsb: null, // ADSBGenerator instance
+        ws: null, // WebSocket instance
+        wsUrl: 'ws://localhost:8080', // Replace with your WebSocket server URL
+
+        /**
+         * Initialize the simulator by setting up the map, drawing tools, and WebSocket.
+         */
+        init: function() {
+          this.initMap();
+          this.initDraw();
+          this.initWebSocket(); // Initialize WebSocket connection
+          this.updatePatternControls();
+        },
+
+        /**
+         * Initialize Mapbox Draw for custom path drawing.
+         */
+        initDraw: function() {
+          this.draw = new MapboxDraw({
+            displayControlsDefault: false,
+            controls: {
+              line_string: true,
+              trash: true
+            }
+          });
+          this.map.addControl(this.draw);
+
+          this.map.on('draw.create', this.updateCustomPath.bind(this));
+          this.map.on('draw.update', this.updateCustomPath.bind(this));
+          this.map.on('draw.delete', this.clearCustomPath.bind(this));
+        },
+
+        /**
+         * Initialize Mapbox map.
+         */
+        initMap: function() {
+          // Replace with your Mapbox access token
+          mapboxgl.accessToken = ''; // <<<=== Replace with your Mapbox token
+
+          this.map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11',
+            center: [145.389904, -37.882707], // [longitude, latitude]
+            zoom: 12
+          });
+
+          this.map.on('load', () => {
+            this.addAircraftIcon();
+          });
+        },
+
+        /**
+         * Initialize WebSocket connection.
+         */
+        initWebSocket: function() {
+          this.ws = new WebSocket(this.wsUrl);
+
+          this.ws.onopen = () => {
+            console.log('WebSocket connection established.');
+            // Send initialization message
+            const initMessage = {
+              type: 'init',
+              message: 'Flight Simulator connected.'
+            };
+            this.ws.send(JSON.stringify(initMessage));
+            console.log('Initialization message sent:', initMessage);
+          };
+
+          this.ws.onmessage = (event) => {
+            console.log('Message from server:', event.data);
+            // Handle incoming messages from the server if necessary
+            // For example, you could display server responses in the ADS-B Output panel
+            const response = JSON.parse(event.data);
+            if (response.status === 'success') {
+              console.log('Server processed ADS-B frames successfully.');
+              // Optionally, display or utilize the encoded frames
+            } else {
+              console.warn('Server failed to process ADS-B data:', response.reason);
+            }
+          };
+
+          this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+          };
+
+          this.ws.onclose = (event) => {
+            console.log('WebSocket connection closed:', event.reason);
+            // Optionally, attempt reconnection after a delay
+            setTimeout(() => {
+              console.log('Attempting to reconnect WebSocket...');
+              this.initWebSocket();
+            }, 5000); // Reconnect after 5 seconds
+          };
+        },
+
+        /**
+         * Update the visibility and state of pattern control panels based on the selected pattern type.
+         */
+        updatePatternControls: function() {
+          const patternType = document.getElementById('patternType').value;
+          document.querySelectorAll('.pattern-controls').forEach(el => {
+            el.style.display = 'none';
+            // Disable inputs in unselected controls
+            el.querySelectorAll('input, select, textarea, button').forEach(input => {
+              input.disabled = true;
+            });
+          });
+          const selectedControl = document.getElementById(`${patternType}Controls`);
+          if (selectedControl) {
+            selectedControl.style.display = 'block';
+            // Enable inputs in the selected control
+            selectedControl.querySelectorAll('input, select, textarea, button').forEach(input => {
+              input.disabled = false;
+            });
+          }
+
+          // Handle Custom Path Mode visibility
+          if (patternType === 'custom') {
+            const customMode = document.getElementById('customMode').value;
+            this.toggleCustomMode(customMode);
+          }
+        },
+
+        /**
+         * Toggle between 'draw' and 'coordinates' modes for custom path creation.
+         */
+        toggleCustomMode: function(selectedMode = null) {
+          const customMode = selectedMode || document.getElementById('customMode').value;
+          document.querySelectorAll('#customDrawControls, #customCoordinatesControls').forEach(el => {
+            el.style.display = 'none';
+            el.querySelectorAll('button, textarea').forEach(input => {
+              input.disabled = true;
+            });
+          });
+
+          if (customMode === 'draw') {
+            document.getElementById('customDrawControls').style.display = 'block';
+            document.getElementById('customDrawControls').querySelector('button').disabled = false;
+          } else if (customMode === 'coordinates') {
+            document.getElementById('customCoordinatesControls').style.display = 'block';
+            document.getElementById('customCoordinates').disabled = false;
+          }
+        },
+
+        /**
+         * Enable drawing mode for custom path creation.
+         */
+        enableDrawMode: function() {
+          this.draw.changeMode('draw_line_string');
+        },
+
+        /**
+         * Update the custom path based on drawn lines.
+         */
+        updateCustomPath: function(e) {
+          const data = this.draw.getAll();
+          if (data.features.length > 0) {
+            const coordinates = data.features[0].geometry.coordinates;
+            this.currentPath = coordinates.map(coord => [coord[0], coord[1]]);
+            this.displayPathOnMap(this.currentPath);
+            this.startSimulation(this.currentPath);
+          }
+        },
+
+        /**
+         * Clear the custom path from the map and stop simulation.
+         */
+        clearCustomPath: function() {
+          this.currentPath = null;
+          this.lineString = null;
+          this.totalDistance = 0;
+          this.currentDistance = 0;
+          this.removePathFromMap();
+          this.stopSimulation();
+          document.getElementById('adsb-output').innerHTML = 'Flight path cleared.';
+          this.resetLiveData();
+        },
+
+        /**
+         * Validate user inputs before generating the flight path.
+         * @returns {boolean} - Returns true if inputs are valid, else false.
+         */
+        validateInputs: function() {
+          const altitude = parseFloat(document.getElementById('altitude').value);
+          const speed = parseFloat(document.getElementById('speed').value);
+          if (isNaN(altitude) || altitude <= 0) {
+            alert('Please enter a valid altitude (positive number).');
+            return false;
+          }
+          if (isNaN(speed) || speed <= 0) {
+            alert('Please enter a valid speed (positive number).');
+            return false;
+          }
+
+          const patternType = document.getElementById('patternType').value;
+          if (patternType === 'follow') {
+            const targetIcao = document.getElementById('targetIcao').value.trim();
+            if (!/^[A-Z0-9]{4}$/.test(targetIcao)) {
+              alert('Please enter a valid ICAO code (4 alphanumeric characters).');
+              return false;
+            }
+          }
+
+          if (patternType === 'custom') {
+            const customMode = document.getElementById('customMode').value;
+            if (customMode === 'coordinates') {
+              const coords = document.getElementById('customCoordinates').value.trim();
+              if (!coords) {
+                alert('Please enter coordinates in JSON array format.');
+                return false;
+              }
+              try {
+                const parsed = JSON.parse(coords);
+                if (!Array.isArray(parsed) || !parsed.every(coord => Array.isArray(coord) && coord.length === 2)) {
+                  throw new Error();
+                }
+              } catch {
+                alert('Invalid coordinates format. Please enter a valid JSON array of [longitude, latitude] pairs.');
+                return false;
+              }
+            }
+          }
+
+          return true;
+        },
+
+        /**
+         * Generate the flight path based on user-selected pattern and start simulation.
+         */
+        generatePath: function() {
+          if (!this.validateInputs()) return;
+
+          // Show loading indicator
+          this.showLoading();
+
+          // Remove existing path and simulation
+          this.removePathFromMap();
+          this.stopSimulation();
+
+          const patternType = document.getElementById('patternType').value;
+          let path = [];
+
+          try {
+            switch (patternType) {
+              case 'circle':
+                const lat = parseFloat(document.getElementById('circleLat').value);
+                const lon = parseFloat(document.getElementById('circleLon').value);
+                const radius = parseFloat(document.getElementById('circleRadius').value);
+                path = this.calculateCirclePath([lon, lat], radius);
+                break;
+
+              case 'follow':
+                // Simulate follow pattern
+                const targetIcao = document.getElementById('targetIcao').value.trim();
+                const followDistance = parseFloat(document.getElementById('followDistance').value);
+                path = this.calculateFollowPath(targetIcao, followDistance);
+                break;
+
+              case 'search':
+                const searchType = document.getElementById('searchType').value;
+                const areaSize = parseFloat(document.getElementById('searchArea').value);
+                const startLat = parseFloat(document.getElementById('searchStartLat').value);
+                const startLon = parseFloat(document.getElementById('searchStartLon').value);
+                path = this.calculateSearchPath(searchType, [startLon, startLat], areaSize);
+                break;
+
+              case 'custom':
+                const customMode = document.getElementById('customMode').value;
+                if (customMode === 'coordinates') {
+                  const coords = JSON.parse(document.getElementById('customCoordinates').value.trim());
+                  path = coords.map(coord => [coord[0], coord[1]]);
+                } else if (customMode === 'draw') {
+                  const data = this.draw.getAll();
+                  if (data.features.length > 0) {
+                    path = data.features[0].geometry.coordinates.map(coord => [coord[0], coord[1]]);
+                  } else {
+                    alert('Please draw a path on the map.');
+                    this.hideLoading();
+                    return;
+                  }
+                }
+                break;
+
+              default:
+                alert('Unknown pattern type.');
+                this.hideLoading();
+                return;
+            }
+
+            if (path.length === 0) {
+              alert('No path generated.');
+              this.hideLoading();
+              return;
+            }
+
+            // Display path on map
+            this.displayPathOnMap(path);
+
+            // Start simulation
+            this.startSimulation(path);
+          } catch (error) {
+            console.error('Error generating path:', error);
+            alert('Error generating flight path. Please check your inputs and try again.');
+          } finally {
+            this.hideLoading();
+          }
+        },
+
+        /**
+         * Calculate a circular flight path using Turf.js.
+         * @param {Array} center - [longitude, latitude] center of the circle.
+         * @param {number} radius - Radius in meters.
+         * @param {number} points - Number of points to define the circle.
+         * @returns {Array} - Array of [longitude, latitude] coordinates forming the circle.
+         */
+        calculateCirclePath: function(center, radius, points = 360) {
+          const line = turf.circle(center, radius / 1000, { units: 'kilometers', steps: points });
+          const path = line.geometry.coordinates[0];
+          return path;
+        },
+
+        /**
+         * Simulate a follow flight path.
+         * @param {string} icao - Target ICAO code.
+         * @param {number} distanceNM - Following distance in nautical miles.
+         * @returns {Array} - Array of [longitude, latitude] coordinates forming the follow path.
+         */
+        calculateFollowPath: function(icao, distanceNM) {
+          // Placeholder: Simulate a target moving eastward
+          // Future Enhancement: Integrate real-time aircraft data
+
+          const baseLat = 51.500722;
+          const baseLon = -0.124462;
+          const distanceMeters = distanceNM * 1852;
+          const path = [];
+
+          // Simulate a circular path around the base point for demonstration
+          const circle = turf.circle([baseLon, baseLat], distanceMeters / 1000, { units: 'kilometers', steps: 360 });
+          circle.geometry.coordinates[0].forEach(coord => {
+            path.push(coord);
+          });
+
+          return path;
+        },
+
+        /**
+         * Calculate a search pattern flight path.
+         * @param {string} type - Type of search pattern ('square', 'parallel', 'sector').
+         * @param {Array} start - [longitude, latitude] starting point of the search.
+         * @param {number} areaSizeKm - Size of the search area in kilometers.
+         * @returns {Array} - Array of [longitude, latitude] coordinates forming the search pattern.
+         */
+        calculateSearchPath: function(type, start, areaSizeKm) {
+          switch (type) {
+            case 'square':
+              return this.calculateExpandingSquarePath(start, areaSizeKm * 1000, 3);
+            case 'parallel':
+              return this.calculateParallelSweepPath(start, areaSizeKm * 1000, 5);
+            case 'sector':
+              return this.calculateSectorSearchPath(start, areaSizeKm * 1000, 90, 3);
+            default:
+              return [];
+          }
+        },
+
+        /**
+         * Calculate an expanding square search pattern.
+         * @param {Array} start - [longitude, latitude] starting point.
+         * @param {number} stepMeters - Step distance in meters.
+         * @param {number} iterations - Number of iterations to expand.
+         * @returns {Array} - Array of [longitude, latitude] coordinates.
+         */
+        calculateExpandingSquarePath: function(start, stepMeters, iterations) {
+          const path = [ [start[0], start[1]] ];
+          let currentPoint = [start[0], start[1]];
+          let currentStep = stepMeters;
+
+          for (let i = 1; i <= iterations; i++) {
+            // Move East
+            currentPoint[0] += currentStep / (111320 * Math.cos(currentPoint[1] * Math.PI / 180));
+            path.push([...currentPoint]);
+            // Move South
+            currentPoint[1] -= currentStep / 111320;
+            path.push([...currentPoint]);
+            // Move West
+            currentPoint[0] -= currentStep / (111320 * Math.cos(currentPoint[1] * Math.PI / 180));
+            path.push([...currentPoint]);
+            // Move North
+            currentPoint[1] += currentStep / 111320;
+            path.push([...currentPoint]);
+
+            // Increase step for next iteration
+            currentStep *= 1.5;
+          }
+
+          return path;
+        },
+
+        /**
+         * Calculate a parallel sweep search pattern.
+         * @param {Array} start - [longitude, latitude] starting point.
+         * @param {number} stepMeters - Step distance in meters.
+         * @param {number} sweeps - Number of sweeps.
+         * @returns {Array} - Array of [longitude, latitude] coordinates.
+         */
+        calculateParallelSweepPath: function(start, stepMeters, sweeps) {
+          const path = [];
+          let currentPoint = [start[0], start[1]];
+          let direction = 1; // 1: East, -1: West
+
+          for (let i = 0; i < sweeps; i++) {
+            // Move East or West
+            currentPoint[0] += direction * stepMeters / (111320 * Math.cos(currentPoint[1] * Math.PI / 180));
+            path.push([...currentPoint]);
+            // Move North
+            currentPoint[1] += stepMeters / 111320;
+            path.push([...currentPoint]);
+            // Move West or East
+            direction *= -1;
+            currentPoint[0] += direction * stepMeters / (111320 * Math.cos(currentPoint[1] * Math.PI / 180));
+            path.push([...currentPoint]);
+            // Move North
+            currentPoint[1] += stepMeters / 111320;
+            path.push([...currentPoint]);
+          }
+
+          return path;
+        },
+
+        /**
+         * Calculate a sector search pattern.
+         * @param {Array} start - [longitude, latitude] starting point.
+         * @param {number} radiusMeters - Radius in meters.
+         * @param {number} angleDegrees - Angle per sector in degrees.
+         * @param {number} iterations - Number of sectors.
+         * @returns {Array} - Array of [longitude, latitude] coordinates.
+         */
+        calculateSectorSearchPath: function(start, radiusMeters, angleDegrees, iterations) {
+          const path = [];
+          const earthRadius = 6378137; // Earth's radius in meters
+
+          for (let i = 0; i < iterations; i++) {
+            const startAngle = i * angleDegrees;
+            for (let a = startAngle; a < startAngle + angleDegrees; a += 1) {
+              const rad = a * Math.PI / 180;
+              const dx = radiusMeters * Math.cos(rad);
+              const dy = radiusMeters * Math.sin(rad);
+
+              const deltaLat = (dy / earthRadius) * (180 / Math.PI);
+              const deltaLon = (dx / (earthRadius * Math.cos(start[1] * Math.PI / 180))) * (180 / Math.PI);
+
+              const lat = start[1] + deltaLat;
+              const lon = start[0] + deltaLon;
+              path.push([lon, lat]);
+            }
+          }
+
+          return path;
+        },
+
+        /**
+         * Display the generated path on the map.
+         * @param {Array} path - Array of [longitude, latitude] coordinates.
+         */
+        displayPathOnMap: function(path) {
+          // Remove existing flight path if present
+          if (this.map.getSource('flight-path')) {
+            this.map.removeLayer('flight-path');
+            this.map.removeSource('flight-path');
+          }
+
+          // Add new flight path source and layer
+          this.map.addSource('flight-path', {
+            'type': 'geojson',
+            'data': {
+              'type': 'Feature',
+              'properties': {},
+              'geometry': {
+                'type': 'LineString',
+                'coordinates': path
+              }
+            }
+          });
+
+          this.map.addLayer({
+            'id': 'flight-path',
+            'type': 'line',
+            'source': 'flight-path',
+            'layout': {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            'paint': {
+              'line-color': '#61dafb',
+              'line-width': 2
+            }
+          });
+
+          // Create a Turf.js LineString
+          this.lineString = turf.lineString(path);
+
+          // Calculate total distance
+          this.totalDistance = turf.length(this.lineString, { units: 'meters' });
+
+          console.log('Flight path displayed on map. Total distance:', this.totalDistance, 'meters');
+        },
+
+        /**
+         * Remove the flight path from the map.
+         */
+        removePathFromMap: function() {
+          if (this.map.getLayer('flight-path')) {
+            this.map.removeLayer('flight-path');
+          }
+          if (this.map.getSource('flight-path')) {
+            this.map.removeSource('flight-path');
+          }
+        },
+
+        /**
+         * Add the aircraft icon to the map using the Aircraft_Blue.png image.
+         */
+        addAircraftIcon: function() {
+          // Check if the image is already added to prevent duplication
+          if (!this.map.hasImage('aircraft-icon')) {
+            this.map.loadImage('images/aircraft.png', (error, image) => {
+              if (error) {
+                console.error('Error loading Aircraft_Blue.png:', error);
+                alert('Failed to load Aircraft_Blue.png. Please ensure the image is in the correct directory.');
+                return;
+              }
+              this.map.addImage('aircraft-icon', image);
+              
+              // Add the aircraft marker source
+              this.map.addSource('aircraft-marker', {
+                'type': 'geojson',
+                'data': {
+                  'type': 'Feature',
+                  'geometry': {
+                    'type': 'Point',
+                    'coordinates': [0, 0] // Initial position; will be updated during simulation
+                  },
+                  'properties': {
+                    'heading': 0
+                  }
+                }
+              });
+
+              // Add the aircraft marker layer
+              this.map.addLayer({
+                'id': 'aircraft-marker',
+                'type': 'symbol',
+                'source': 'aircraft-marker',
+                'layout': {
+                  'icon-image': 'aircraft-icon',
+                  'icon-size': 1.5, // Adjust size as needed
+                  'icon-rotate': ['get', 'heading'],
+                  'icon-rotation-alignment': 'map',
+                  'icon-ignore-placement': true,
+                  'icon-allow-overlap': true
+                }
+              });
+
+              console.log('Aircraft icon added successfully.');
+            });
+          }
+        },
+
+        /**
+         * Start the ADS-B simulation along the generated path.
+         * @param {Array} path - Array of [longitude, latitude] coordinates.
+         */
+        startSimulation: function(path) {
+          if (!this.lineString) {
+            console.error('LineString not defined. Cannot start simulation.');
+            return;
+          }
+
+          this.stopSimulation(); // Clear any existing simulation
+
+          // Initialize ADSBGenerator
+          this.adsb = new ADSBGenerator();
+
+          // Get speed from input and convert to meters per second
+          const speedKnots = parseFloat(document.getElementById('speed').value);
+          this.speedMps = speedKnots * 1852 / 3600; // 1 knot = 1852 m/h
+
+          // Initialize current distance
+          this.currentDistance = 0;
+
+          // Simulation step distance
+          const stepDistance = this.speedMps * (this.simulationInterval / 1000); // meters
+
+          this.simulation = setInterval(() => {
+            this.currentDistance += stepDistance;
+
+            // Loop the path if necessary
+            if (this.currentDistance > this.totalDistance) {
+              if (this.isLooping) {
+                this.currentDistance = this.currentDistance - this.totalDistance;
+              } else {
+                this.stopSimulation();
+                return;
+              }
+            }
+
+            // Get the new position along the path
+            const newPoint = turf.along(this.lineString, this.currentDistance, { units: 'meters' });
+            const coords = newPoint.geometry.coordinates;
+
+            // Determine heading based on movement
+            let heading = 0;
+            if (this.currentDistance + stepDistance <= this.totalDistance) {
+              const nextPoint = turf.along(this.lineString, this.currentDistance + stepDistance, { units: 'meters' });
+              heading = turf.bearing(newPoint, nextPoint);
+            } else {
+              const firstPoint = turf.along(this.lineString, 0, { units: 'meters' });
+              heading = turf.bearing(newPoint, firstPoint);
+            }
+
+            // Generate ADS-B message with message_type
+            const message = {
+              message_type: "airborne_position", // Specify the message type
+              timestamp: new Date().toISOString(),
+              icao: this.adsb.icao,
+              lat: coords[1],
+              lon: coords[0],
+              altitude: parseFloat(document.getElementById('altitude').value),
+              speed: speedKnots,
+              heading: heading
+            };
+
+            // Send ADS-B message via WebSocket
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify(message));
+              console.log('ADS-B data sent:', message);
+            } else {
+              console.warn('WebSocket is not open. Cannot send ADS-B data.');
+            }
+
+            // Update aircraft marker position and rotation
+            const updatedFeature = {
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': coords
+              },
+              'properties': {
+                'heading': heading
+              }
+            };
+            this.map.getSource('aircraft-marker').setData(updatedFeature);
+
+            // Update ADS-B output and live data
+            document.getElementById('adsb-output').innerHTML = JSON.stringify(message, null, 2);
+            this.updateLiveData(message);
+          }, this.simulationInterval);
+
+          console.log('Simulation started.');
+        },
+
+        /**
+         * Stop the ADS-B simulation.
+         */
+        stopSimulation: function() {
+          if (this.simulation) {
+            clearInterval(this.simulation);
+            this.simulation = null;
+            console.log('Simulation stopped.');
+          }
+          this.adsb = null;
+          this.currentDistance = 0;
+          // Reset aircraft marker position and rotation
+          if (this.map.getSource('aircraft-marker')) {
+            this.map.getSource('aircraft-marker').setData({
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': [0, 0]
+              },
+              'properties': {
+                'heading': 0
+              }
+            });
+          }
+        },
+
+        /**
+         * Update the live data panel with the latest ADS-B message.
+         * @param {Object} message - ADS-B message object.
+         */
+        updateLiveData: function(message) {
+          const liveData = document.getElementById('live-data');
+          const dataItems = liveData.querySelectorAll('.data-item');
+          dataItems.forEach(item => {
+            const label = item.querySelector('label').textContent;
+            const span = item.querySelector('span');
+            switch(label) {
+              case 'Latitude:':
+                span.textContent = message.lat.toFixed(6);
+                break;
+              case 'Longitude:':
+                span.textContent = message.lon.toFixed(6);
+                break;
+              case 'Altitude:':
+                span.textContent = `${message.altitude} ft`;
+                break;
+              case 'Speed:':
+                span.textContent = `${message.speed} kts`;
+                break;
+              case 'Heading:':
+                span.textContent = `${message.heading.toFixed(1)}°`;
+                break;
+              case 'Timestamp:':
+                span.textContent = message.timestamp;
+                break;
+              case 'ICAO:':
+                span.textContent = message.icao;
+                break;
+              default:
+                span.textContent = '--';
+            }
+          });
+        },
+
+        /**
+         * Reset the live data panel to default values.
+         */
+        resetLiveData: function() {
+          const liveData = document.getElementById('live-data');
+          const dataItems = liveData.querySelectorAll('.data-item span');
+          dataItems.forEach(span => {
+            span.textContent = '--';
+          });
+        },
+
+        /**
+         * Display the loading overlay.
+         */
+        showLoading: function() {
+          document.getElementById('loading').style.display = 'flex';
+        },
+
+        /**
+         * Hide the loading overlay.
+         */
+        hideLoading: function() {
+          document.getElementById('loading').style.display = 'none';
+        },
+
+        /**
+         * Toggle visibility of control or display panel.
+         * @param {string} panel - 'control' or 'display'
+         */
+        togglePanel: function(panel) {
+          if (panel === 'control') {
+            const controlPanel = document.getElementById('controlPanel');
+            const toggleBtn = document.getElementById('toggleControlPanel');
+            controlPanel.classList.toggle('hidden');
+            // Change toggle button icon based on panel state
+            if (controlPanel.classList.contains('hidden')) {
+              toggleBtn.innerHTML = '&#9776;'; // Hamburger icon
+            } else {
+              toggleBtn.innerHTML = '&times;'; // Close icon
+            }
+          } else if (panel === 'display') {
+            const displayPanel = document.getElementById('displayPanel');
+            const toggleBtn = document.getElementById('toggleDisplayPanel');
+            displayPanel.classList.toggle('hidden');
+            // Change toggle button icon based on panel state
+            if (displayPanel.classList.contains('hidden')) {
+              toggleBtn.innerHTML = '&#9881;'; // Gear icon
+            } else {
+              toggleBtn.innerHTML = '&times;'; // Close icon
+            }
+          }
+        }
+      };
+
+      /**
+       * ADSB Message Generator Class
+       */
+      class ADSBGenerator {
+        constructor() {
+          this.icao = this.generateRandomICAO();
+        }
+
+        /**
+         * Generate a random 6-character hexadecimal ICAO code.
+         * @returns {string} - Random ICAO code.
+         */
+        generateRandomICAO() {
+          return Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(6, '0');
+        }
+
+        /**
+         * Generate an ADS-B message.
+         * @param {number} lat - Latitude.
+         * @param {number} lon - Longitude.
+         * @param {number} alt - Altitude in feet.
+         * @param {number} speed - Speed in knots.
+         * @param {number} heading - Heading in degrees.
+         * @returns {Object} - ADS-B message object.
+         */
+        generateMessage(lat, lon, alt, speed, heading) {
+          return {
+            timestamp: new Date().toISOString(),
+            icao: this.icao,
+            lat: lat,
+            lon: lon,
+            altitude: alt,
+            speed: speed,
+            heading: heading
+          };
+        }
+      }
+
+      // Expose FlightSimulator to the global scope for access by HTML
+      window.FlightSimulator = FlightSimulator;
+
+      // Initialize the simulator when the DOM is fully loaded
+      document.addEventListener('DOMContentLoaded', () => {
+        FlightSimulator.init();
+
+        // Handle Custom Mode Changes
+        document.getElementById('patternType').addEventListener('change', () => {
+          FlightSimulator.updatePatternControls();
+        });
+        document.getElementById('customMode').addEventListener('change', () => {
+          FlightSimulator.toggleCustomMode();
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
